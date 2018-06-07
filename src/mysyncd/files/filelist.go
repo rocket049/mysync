@@ -55,7 +55,7 @@ func walker(path1 string, info os.FileInfo, err error) error {
 	if len(upath) == 0 {
 		return nil
 	}
-	if upath[:1] == "." {
+	if upath[:1] == "." || upath[:1] == "_" {
 		return nil
 	}
 	if info.IsDir() {

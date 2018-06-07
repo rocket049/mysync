@@ -1,7 +1,7 @@
 # mysync
 
 #### 项目介绍
-基于RSA、AES256加密验证的单向同步软件
+基于RSA、AES256加密验证的单向同步软件，从客户端同步到服务端，自动跳过第一级目录中以`.`或`_`开头的文件和目录。
 
 #### 软件架构
 软件架构说明
@@ -14,10 +14,13 @@
 3. xxxx
 
 #### 使用说明
-
-1. xxxx
-2. xxxx
-3. xxxx
+linux
+1. mysyncd : 服务器，使用配置文件目录：`HOME/mysyncd/`，`mykey.pub`是客户端RSA公钥,`mykey.json`指明同步目录，
+`mykey`名字可以改变，和客户端的配置有关。
+2. mysync : 客户端，使用配置文件目录：`HOME/mysync/`，`mykey.key`是客户端RSA私钥，`local.json`指明本地目录`root`、
+服务器地址`host`，标识符`key`，标识符必须和服务器上的`.pub`、`.json`文件前面的名字相同，和本地的私钥文件`.key`文件的
+名字也必须相同。
+3. genkey：密码工具，生成一对RSA密钥`name.pub`、`name.key`，用法：`genkey -k name`。
 
 #### 参与贡献
 
