@@ -1,7 +1,7 @@
 all:mysync mysyncd genkey
 mysync:
-	go install $(GFLAGS) dev/mysyncd/mysync
+	go install $(GFLAGS) mysyncd/mysync
 mysyncd:
-	go install $(GFLAGS) dev/mysyncd
+	go install $(GFLAGS) mysyncd
 genkey:
-	go install $(GFLAGS) dev/mysyncd/genkey
+	go install $(GFLAGS) mysyncd/genkey
