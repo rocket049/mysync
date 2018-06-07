@@ -251,6 +251,9 @@ func wait_sig() {
 }
 func mkdir_p(p string) error {
 	d, _ := path.Split(p)
+    if len(d)==0{
+        return nil
+    }
 	return os.MkdirAll(d, os.ModePerm)
 }
 

@@ -142,7 +142,12 @@ func syncDel(rpc1 *rpc.Client, name1 string, k []byte) (uplist []string, retk []
 //upload list and return new key
 func uploadList(uplist []string, name1 string, k []byte) []byte {
 	//create zip file
-	dir1 := path.Join(os.Getenv("HOME"), ".tmp")
+	home := os.Getenv("HOME")
+    if len(home)==0{
+        //windows
+        home = "/"
+    }
+	dir1 := path.Join( home, ".tmp")
 	os.MkdirAll(dir1, os.ModePerm)
 	filename1 := path.Join(dir1, "up.zip")
 	fp, err := os.Create(filename1)
