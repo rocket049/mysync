@@ -8,8 +8,8 @@ all: mysyncd.exe mysync.exe genkey.exe
 mysyncd.exe:
 	go install $(LDFLAGS) mysyncd
 mysync.exe:
-	go install mysyncd/mysync
+	go install mysync
 genkey.exe:
-	go install mysyncd/genkey
+	go install genkey
 
 	
