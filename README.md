@@ -4,23 +4,34 @@
 基于RSA、AES256加密验证的单向同步软件，从客户端同步到服务端，自动跳过第一级目录中以`.`或`_`开头的文件和目录。
 
 #### 软件架构
-软件架构说明
+软件架构说明：
 
+服务器和客户端的通讯使用`RPC`和`HTTP`，`RPC`进行控制，`HTTP`上传文件。
 
 #### 安装教程
 
-1. xxxx
+1. 把`src`目录下的几个目录复制到`GOPATH/src`，下面，然后编译。
 2. xxxx
 3. xxxx
 
 #### 使用说明
-linux
+
+*linux*
+
+`linux`目录中有配置文件、Makefile样本。
+
 1. mysyncd : 服务器，使用配置文件目录：`HOME/mysyncd/`，`mykey.pub`是客户端RSA公钥,`mykey.json`指明同步目录，
 `mykey`名字可以改变，和客户端的配置有关。
 2. mysync : 客户端，使用配置文件目录：`HOME/mysync/`，`mykey.key`是客户端RSA私钥，`local.json`指明本地目录`root`、
 服务器地址`host`，标识符`key`，标识符必须和服务器上的`.pub`、`.json`文件前面的名字相同，和本地的私钥文件`.key`文件的
 名字也必须相同。
 3. genkey：密码工具，生成一对RSA密钥`name.pub`、`name.key`，用法：`genkey -k name`。
+
+*windows*
+
+`windows`目录中有配置文件、Makefile（在`linux`下交叉编译）样本。
+
+和`linux`的区别：配置文件放在可执行文件`mysyncd.exe`、`mysync.exe`同一目录下的`conf`目录中。
 
 #### 参与贡献
 
