@@ -21,6 +21,7 @@ import (
 	"path"
 	"path/filepath"
 	"sync"
+    "flag"
 )
 
 type Args struct {
@@ -125,6 +126,9 @@ func (self *OperatorMutex) Release(name1 string) {
 
 func (t *Ctlrpc) Login(arg *Args, reply *[]byte) error {
 	//rsa valid
+    if len(arg.Msg)<33{
+        return errors.New("fail verify")
+    }
 	name1 := string(arg.Msg[32:])
 	pub_keyfile := path.Join(pub_key_dir, fmt.Sprintf("%v.pub", name1))
 	pubk := mycrypto.ReadPublicKey(pub_keyfile)
@@ -167,6 +171,9 @@ func (t *Ctlrpc) Login(arg *Args, reply *[]byte) error {
 
 func (t *Ctlrpc) SyncDel(arg *Args, res *Reply) error {
 	//compare and return upload list
+    if len(arg.Msg)<33{
+		return errors.New("fail verify")
+    }
 	name1 := string(arg.Msg[32:])
 	k1 := cfg.GetKey(name1)
 	vmsg := mycrypto.AES256Decode(k1, arg.Valid)
@@ -194,6 +201,9 @@ func (t *Ctlrpc) SyncDel(arg *Args, res *Reply) error {
 	return nil
 }
 func (t *Ctlrpc) Logout(arg *Args, res *string) error {
+    if len(arg.Msg)<33{
+		return errors.New("fail verify")
+    }
 	name1 := string(arg.Msg[32:])
 	vmsg := mycrypto.AES256Decode(cfg.GetKey(name1), arg.Valid)
 	if bytes.Compare(vmsg, arg.Msg) != 0 {
@@ -223,6 +233,8 @@ func (self *NullWriter) Close() {
 }
 
 func main() {
+    var host = flag.String("host",":6080","[-host ip:port]: bind special address and port")
+    flag.Parse()
 	set_win_dir()
 	//set log not output
 	var null1 = new(NullWriter)
@@ -234,7 +246,7 @@ func main() {
 	rpc1.Register(ctl)
 	http.HandleFunc("/mysync/upload", HandleUpload)
 	rpc1.HandleHTTP("/mysync/ctlrpc", "/mysync/dbgrpc")
-	l, e := net.Listen("tcp", ":6080")
+	l, e := net.Listen("tcp", *host)
 	defer l.Close()
 	if e != nil {
 		log.Fatal("listen error:", e)
@@ -276,6 +288,11 @@ func HandleUpload(resp http.ResponseWriter, req *http.Request) {
 	sig, _ := hex.DecodeString(form1.Value["sig"][0])
 	msg, _ := hex.DecodeString(form1.Value["msg"][0])
 	//log.Println(msg, req.FormValue("msg"))
+    if len(msg)<33{
+        resp.WriteHeader(200)
+		resp.Write([]byte("fail verify"))
+		return
+    }
 	name1 := string(msg[32:])
 	k1 := cfg.GetKey(name1)
 	vmsg := mycrypto.AES256Decode(k1, sig)
