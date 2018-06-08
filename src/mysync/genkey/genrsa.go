@@ -1,7 +1,7 @@
 package main
 
 import (
-	"mysyncd/mycrypto"
+	"mysync/mysyncd/mycrypto"
 	"flag"
 )
 

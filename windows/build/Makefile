@@ -6,10 +6,10 @@ LDFLAGS=-ldflags -H=windowsgui
 all: mysyncd.exe mysync.exe genkey.exe
 
 mysyncd.exe:
-	go install $(LDFLAGS) mysyncd
+	go install $(LDFLAGS) mysync/mysyncd
 mysync.exe:
-	go install mysync
+	go install mysync/mysync
 genkey.exe:
-	go install genkey
+	go install mysync/genkey
 
 	
