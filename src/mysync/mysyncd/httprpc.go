@@ -4,15 +4,15 @@ import (
 	"archive/zip"
 	"bytes"
 	"crypto/rand"
-	"mysync/mysyncd/conf"
-	"mysync/mysyncd/files"
-	"mysync/mysyncd/mycrypto"
 	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
 	"log"
+	"mysync/mysyncd/conf"
+	"mysync/mysyncd/files"
+	"mysync/mysyncd/mycrypto"
 	"net"
 	"net/http"
 	"net/rpc"
@@ -232,8 +232,8 @@ func main() {
 	ctl := new(Ctlrpc)
 	rpc1 := rpc.NewServer()
 	rpc1.Register(ctl)
-	http.HandleFunc("/upload", HandleUpload)
-	rpc1.HandleHTTP("/ctlrpc", "/dbgrpc")
+	http.HandleFunc("/mysync/upload", HandleUpload)
+	rpc1.HandleHTTP("/mysync/ctlrpc", "/mysync/dbgrpc")
 	l, e := net.Listen("tcp", ":6080")
 	defer l.Close()
 	if e != nil {
@@ -251,9 +251,9 @@ func wait_sig() {
 }
 func mkdir_p(p string) error {
 	d, _ := path.Split(p)
-    if len(d)==0{
-        return nil
-    }
+	if len(d) == 0 {
+		return nil
+	}
 	return os.MkdirAll(d, os.ModePerm)
 }
 

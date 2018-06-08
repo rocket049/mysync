@@ -4,14 +4,15 @@ import (
 	"archive/zip"
 	"bytes"
 	"crypto/rand"
-	"mysync/mysyncd/conf"
-	"mysync/mysyncd/files"
-	"mysync/mysyncd/mycrypto"
 	"encoding/hex"
 	"errors"
+	"flag"
 	"fmt"
 	"io"
 	"log"
+	"mysync/mysyncd/conf"
+	"mysync/mysyncd/files"
+	"mysync/mysyncd/mycrypto"
 	"net/rpc"
 	"os"
 	"path"
@@ -32,19 +33,23 @@ type Reply struct {
 type Ctlrpc int
 
 var host, root string
-var pri_key_dir = "/home/ufhz/conf/"
-var conf_file_dir = "/home/ufhz/conf/"
+var pri_key_dir = "conf/"
+var conf_file_dir = "conf/"
 
 func main() {
+	var conf1 = flag.String("conf", "local", "[-conf name] select special config file 'name.json'")
+	flag.Parse()
+
 	set_win_dir()
-	var cfg = conf.ReadJSON(path.Join(conf_file_dir, "local.json"))
+
+	var cfg = conf.ReadJSON(path.Join(conf_file_dir, *conf1+".json"))
 	if cfg == nil {
-		panic("No config local.json")
+		panic("No config " + *conf1 + ".json")
 	}
 	root = cfg["root"]
 	host = cfg["host"]
 	var name1 = cfg["key"]
-	client, err := rpc.DialHTTPPath("tcp", host, "/ctlrpc")
+	client, err := rpc.DialHTTPPath("tcp", host, "/mysync/ctlrpc")
 	if err != nil {
 		panic(err)
 	}
@@ -59,8 +64,8 @@ func main() {
 		panic("sync and del fail")
 	}
 	if len(uplist) > 0 {
-		for _, v := range uplist {
-			log.Println(v)
+		for i, v := range uplist {
+			log.Printf("UPLOAD %v: %v\n", i+1, v)
 		}
 		key1 = uploadList(uplist, name1, key1)
 		if key1 == nil {
@@ -143,11 +148,11 @@ func syncDel(rpc1 *rpc.Client, name1 string, k []byte) (uplist []string, retk []
 func uploadList(uplist []string, name1 string, k []byte) []byte {
 	//create zip file
 	home := os.Getenv("HOME")
-    if len(home)==0{
-        //windows
-        home = "/"
-    }
-	dir1 := path.Join( home, ".tmp")
+	if len(home) == 0 {
+		//windows
+		home = "/"
+	}
+	dir1 := path.Join(home, ".tmp")
 	os.MkdirAll(dir1, os.ModePerm)
 	filename1 := path.Join(dir1, "up.zip")
 	fp, err := os.Create(filename1)
@@ -212,7 +217,7 @@ func uploadList(uplist []string, name1 string, k []byte) []byte {
 		log.Println("error AES256Encode")
 		return nil
 	}
-	var url = fmt.Sprintf("http://%v/upload", host)
+	var url = fmt.Sprintf("http://%v/mysync/upload", host)
 	ret := files.PostFile(filename1, url, &files.MyValid{valid, msg})
 	if ret == nil {
 		log.Println("error upload zip")
