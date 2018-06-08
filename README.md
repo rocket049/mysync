@@ -11,7 +11,7 @@
 #### 安装教程
 
 1. 把`src`目录下的几个目录复制到`GOPATH/src`下面，然后编译。
-2. xxxx
+2. “附件”中有编译好的win32版本和linux_amd64版本，静态链接的，解压后可以直接运行。
 3. xxxx
 
 #### 使用说明
@@ -21,11 +21,11 @@
 `linux`目录中有配置文件、Makefile样本。
 
 1. mysyncd : 服务器，使用配置文件目录：`HOME/mysyncd/`，`mykey.pub`是客户端RSA公钥,`mykey.json`指明同步目录，
-`mykey`名字可以改变，和客户端的配置有关。
-2. mysync : 客户端，使用配置文件目录：`HOME/mysync/`，`mykey.key`是客户端RSA私钥，`local.json`指明本地目录`root`、
+`mykey`名字可以改变，和客户端的配置有关。默认绑定地址为`":6080"`,可使用参数`host`改变，参数格式：`-host IP:PORT`。
+2. mysync : 客户端，使用配置文件目录：`HOME/mysync/`，`mykey.key`是客户端RSA私钥，默认配置文件`local.json`指明本地目录`root`、
 服务器地址`host`，标识符`key`，标识符必须和服务器上的`.pub`、`.json`文件前面的名字相同，和本地的私钥文件`.key`文件的
-名字也必须相同。
-3. genkey：密码工具，生成一对RSA密钥`name.pub`、`name.key`，用法：`genkey -k name`。
+名字也必须相同。配置文件可以指定：`-conf name`代表使用名字为`name.json`的配置文件。
+3. genkey：密码工具，生成一对RSA2048密钥`name.pub`、`name.key`，用法：`genkey -k name`。
 
 *windows*
 
