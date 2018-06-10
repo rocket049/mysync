@@ -16,22 +16,22 @@
 
 #### 使用说明
 
-*linux*
+*linux*最新更新：2018-6-10
 
 `linux`目录中有配置文件、Makefile样本。
 
-1. mysyncd : 服务器，使用配置文件目录：`HOME/mysyncd/`，`mykey.pub`是客户端RSA公钥,`mykey.json`指明同步目录，
+1. mysyncd : 服务器，使用配置文件目录：`HOME/config/mysyncd/`，`mykey.pub`是客户端RSA公钥,`mykey.json`指明同步目录，
 `mykey`名字可以改变，和客户端的配置有关。默认绑定地址为`":6080"`,可使用参数`host`改变，参数格式：`-host IP:PORT`。
-2. mysync : 客户端，使用配置文件目录：`HOME/mysync/`，`mykey.key`是客户端RSA私钥，默认配置文件`local.json`指明本地目录`root`、
+2. mysync : 客户端，使用配置文件目录：`HOME/config/mysync/`，`mykey.key`是客户端RSA私钥，默认配置文件`local.json`指明本地目录`root`、
 服务器地址`host`，标识符`key`，标识符必须和服务器上的`.pub`、`.json`文件前面的名字相同，和本地的私钥文件`.key`文件的
 名字也必须相同。配置文件可以指定：`-conf name`代表使用名字为`name.json`的配置文件。
 3. genkey：密码工具，生成一对RSA2048密钥`name.pub`、`name.key`，用法：`genkey -k name`。
 
-*windows*
+*windows*最新更新：2018-6-10
 
 `windows`目录中有配置文件、Makefile（在`linux`下交叉编译）样本。
 
-和`linux`的区别：配置文件放在可执行文件`mysyncd.exe`、`mysync.exe`同一目录下的`conf`目录中。
+和`linux`的区别：配置文件放在可执行文件`mysyncd.exe`、`mysync.exe`同一目录下的`config/mysyncd/`和`config/mysync/`目录中。
 
 #### 参与贡献
 
