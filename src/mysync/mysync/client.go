@@ -251,14 +251,14 @@ func logout(rpc1 *rpc.Client, name1 string, k []byte) error {
 func set_win_dir() {
 	if len(os.Getenv("windir")) == 0 {
 		home := os.Getenv("HOME")
-		pri_key_dir = path.Join(home, "mysync/")
-		conf_file_dir = path.Join(home, "mysync/")
+		pri_key_dir = path.Join(home, "config/mysync/")
+		conf_file_dir = path.Join(home, "config/mysync/")
 		return
 	}
 	log.Println("OS: Windows")
 	exe1, _ := os.Executable()
 	dir1 := filepath.Dir(exe1)
-	conf1 := filepath.Join(dir1, "conf/")
+	conf1 := filepath.Join(dir1, "config/mysync/")
 	pri_key_dir = conf1
 	conf_file_dir = conf1
 }

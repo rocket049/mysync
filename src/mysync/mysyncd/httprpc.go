@@ -6,6 +6,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"errors"
+	"flag"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -21,7 +22,6 @@ import (
 	"path"
 	"path/filepath"
 	"sync"
-    "flag"
 )
 
 type Args struct {
@@ -47,14 +47,14 @@ var root map[string]string = make(map[string]string)
 func set_win_dir() {
 	if len(os.Getenv("windir")) == 0 {
 		home := os.Getenv("HOME")
-		pub_key_dir = path.Join(home, "mysyncd/")
-		conf_file_dir = path.Join(home, "mysyncd/")
+		pub_key_dir = path.Join(home, "config/mysyncd/")
+		conf_file_dir = path.Join(home, "config/mysyncd/")
 		return
 	}
 	log.Println("OS: Windows")
 	exe1, _ := os.Executable()
 	dir1 := filepath.Dir(exe1)
-	conf1 := filepath.Join(dir1, "conf/")
+	conf1 := filepath.Join(dir1, "config/mysyncd/")
 	pub_key_dir = conf1
 	conf_file_dir = conf1
 }
@@ -126,9 +126,9 @@ func (self *OperatorMutex) Release(name1 string) {
 
 func (t *Ctlrpc) Login(arg *Args, reply *[]byte) error {
 	//rsa valid
-    if len(arg.Msg)<33{
-        return errors.New("fail verify")
-    }
+	if len(arg.Msg) < 33 {
+		return errors.New("fail verify")
+	}
 	name1 := string(arg.Msg[32:])
 	pub_keyfile := path.Join(pub_key_dir, fmt.Sprintf("%v.pub", name1))
 	pubk := mycrypto.ReadPublicKey(pub_keyfile)
@@ -171,9 +171,9 @@ func (t *Ctlrpc) Login(arg *Args, reply *[]byte) error {
 
 func (t *Ctlrpc) SyncDel(arg *Args, res *Reply) error {
 	//compare and return upload list
-    if len(arg.Msg)<33{
+	if len(arg.Msg) < 33 {
 		return errors.New("fail verify")
-    }
+	}
 	name1 := string(arg.Msg[32:])
 	k1 := cfg.GetKey(name1)
 	vmsg := mycrypto.AES256Decode(k1, arg.Valid)
@@ -201,9 +201,9 @@ func (t *Ctlrpc) SyncDel(arg *Args, res *Reply) error {
 	return nil
 }
 func (t *Ctlrpc) Logout(arg *Args, res *string) error {
-    if len(arg.Msg)<33{
+	if len(arg.Msg) < 33 {
 		return errors.New("fail verify")
-    }
+	}
 	name1 := string(arg.Msg[32:])
 	vmsg := mycrypto.AES256Decode(cfg.GetKey(name1), arg.Valid)
 	if bytes.Compare(vmsg, arg.Msg) != 0 {
@@ -233,8 +233,8 @@ func (self *NullWriter) Close() {
 }
 
 func main() {
-    var host = flag.String("host",":6080","[-host ip:port]: bind special address and port")
-    flag.Parse()
+	var host = flag.String("host", ":6080", "[-host ip:port]: bind special address and port")
+	flag.Parse()
 	set_win_dir()
 	//set log not output
 	var null1 = new(NullWriter)
@@ -288,11 +288,11 @@ func HandleUpload(resp http.ResponseWriter, req *http.Request) {
 	sig, _ := hex.DecodeString(form1.Value["sig"][0])
 	msg, _ := hex.DecodeString(form1.Value["msg"][0])
 	//log.Println(msg, req.FormValue("msg"))
-    if len(msg)<33{
-        resp.WriteHeader(200)
+	if len(msg) < 33 {
+		resp.WriteHeader(200)
 		resp.Write([]byte("fail verify"))
 		return
-    }
+	}
 	name1 := string(msg[32:])
 	k1 := cfg.GetKey(name1)
 	vmsg := mycrypto.AES256Decode(k1, sig)
