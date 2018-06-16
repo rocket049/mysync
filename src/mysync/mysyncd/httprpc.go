@@ -3,6 +3,7 @@ package main
 import (
 	"archive/zip"
 	"bytes"
+	"compress/gzip"
 	"crypto/rand"
 	"encoding/hex"
 	"errors"
@@ -11,6 +12,7 @@ import (
 	"io"
 	"io/ioutil"
 	"log"
+	mr "math/rand"
 	"mysync/mysyncd/conf"
 	"mysync/mysyncd/files"
 	"mysync/mysyncd/mycrypto"
@@ -43,6 +45,7 @@ var conf_file_dir = "mysyncd/"
 var filemap map[string]map[string]files.FileDesc = make(map[string]map[string]files.FileDesc)
 var aeskey map[string][]byte = make(map[string][]byte)
 var root map[string]string = make(map[string]string)
+var trans map[int]*os.File = make(map[int]*os.File)
 
 func set_win_dir() {
 	if len(os.Getenv("windir")) == 0 {
@@ -60,7 +63,7 @@ func set_win_dir() {
 }
 
 type OperatorMutex struct {
-	listlock, aeslock, rootlock sync.RWMutex
+	listlock, aeslock, rootlock, translock sync.RWMutex
 }
 
 var cfg = new(OperatorMutex)
@@ -109,6 +112,30 @@ func (self *OperatorMutex) GetRoot(name1 string) string {
 	} else {
 		return ""
 	}
+}
+func (self *OperatorMutex) SetTrans(key1 int, file1 *os.File) {
+	self.translock.Lock()
+	trans[key1] = file1
+	self.translock.Unlock()
+}
+func (self *OperatorMutex) GetTrans(key1 int) *os.File {
+	self.translock.RLock()
+	file1, ok := trans[key1]
+	self.translock.RUnlock()
+	if ok {
+		return file1
+	} else {
+		return nil
+	}
+}
+func (self *OperatorMutex) DelCloseTrans(key1 int) {
+	self.translock.Lock()
+	file1, ok := trans[key1]
+	if ok {
+		file1.Close()
+	}
+	delete(trans, key1)
+	self.translock.Unlock()
 }
 func (self *OperatorMutex) Release(name1 string) {
 	self.listlock.Lock()
@@ -217,6 +244,57 @@ func (t *Ctlrpc) Logout(arg *Args, res *string) error {
 	return nil
 }
 
+func (t *Ctlrpc) CreateTempFile(arg *Args, key1 *int) error {
+	//compare and return upload list
+	if len(arg.Msg) < 33 {
+		return errors.New("fail verify")
+	}
+	name1 := string(arg.Msg[32:])
+	k1 := cfg.GetKey(name1)
+	vmsg := mycrypto.AES256Decode(k1, arg.Valid)
+	if bytes.Compare(vmsg, arg.Msg) != 0 {
+		return errors.New("SyncDel: security verify fail")
+	}
+	//create file
+	*key1 = mr.Int()
+	tmp := path.Join(os.Getenv("HOME"), ".tmp")
+	os.MkdirAll(tmp, os.ModePerm)
+	tmpzip, _ := ioutil.TempFile(tmp, "up")
+	cfg.SetTrans(*key1, tmpzip)
+	return nil
+}
+
+type AppendData struct {
+	Key  int
+	Name string
+	Gz   []byte
+}
+
+func (t *Ctlrpc) AppendFile(arg *AppendData, size1 *int) error {
+	buf1 := bytes.NewBuffer(arg.Gz)
+	zr1, err := gzip.NewReader(buf1)
+	if err != nil {
+		return err
+	}
+	fp := cfg.GetTrans(arg.Key)
+	if fp == nil {
+		return errors.New("File not Created")
+	}
+	sz1, _ := io.Copy(fp, zr1)
+	*size1 = int(sz1)
+	zr1.Close()
+	return nil
+}
+func (t *Ctlrpc) FinishFile(arg *AppendData, reply *int) error {
+	fp := cfg.GetTrans(arg.Key)
+	pathname1 := fp.Name()
+	cfg.DelCloseTrans(arg.Key)
+	defer os.Remove(pathname1)
+	//unzip
+	*reply = 1
+	return UnZipFile(pathname1, arg.Name)
+}
+
 type NullWriter struct {
 	fp *os.File
 }
@@ -234,6 +312,7 @@ func (self *NullWriter) Close() {
 
 func main() {
 	var host = flag.String("host", ":6080", "[-host ip:port]: bind special address and port")
+	var mode1 = flag.String("mode", "rpc", "[-mode rpc/http] 纯rpc模式/rpc、http混合模式")
 	flag.Parse()
 	set_win_dir()
 	//set log not output
@@ -242,16 +321,31 @@ func main() {
 	defer null1.Close()
 
 	ctl := new(Ctlrpc)
-	rpc1 := rpc.NewServer()
-	rpc1.Register(ctl)
-	http.HandleFunc("/mysync/upload", HandleUpload)
-	rpc1.HandleHTTP("/mysync/ctlrpc", "/mysync/dbgrpc")
-	l, e := net.Listen("tcp", *host)
-	defer l.Close()
-	if e != nil {
-		log.Fatal("listen error:", e)
+	if *mode1 == "http" {
+		fmt.Println("rpc http mode")
+		rpc1 := rpc.NewServer()
+		rpc1.Register(ctl)
+		http.HandleFunc("/mysync/upload", HandleUpload)
+		rpc1.HandleHTTP("/mysync/ctlrpc", "/mysync/dbgrpc")
+		l, e := net.Listen("tcp", *host)
+		if e != nil {
+			log.Fatal("listen error:", e)
+		}
+		defer l.Close()
+		go http.Serve(l, nil)
+	} else {
+		fmt.Println("rpc tcp mode")
+		err := rpc.Register(ctl)
+		if err != nil {
+			panic(err)
+		}
+		l, e := net.Listen("tcp", *host)
+		if e != nil {
+			log.Fatal("listen error:", e)
+		}
+		defer l.Close()
+		go rpc.Accept(l)
 	}
-	go http.Serve(l, nil)
 	wait_sig()
 }
 
@@ -388,4 +482,62 @@ func HandleUpload(resp http.ResponseWriter, req *http.Request) {
 	cfg.SetKey(name1, k)
 	resp.WriteHeader(200)
 	resp.Write([]byte("ok " + ck))
+}
+
+func UnZipFile(filename, name1 string) error {
+	root := cfg.GetRoot(name1)
+	zreader, err := zip.OpenReader(filename)
+	if err != nil {
+		log.Println(err)
+		return err
+	}
+	for _, v := range zreader.File {
+		info := v.FileInfo()
+		path1 := path.Join(root, v.Name)
+		log.Printf("UPLOAD: %v\n", path1)
+		if info.IsDir() {
+			_, err1 := os.Stat(path1)
+			if err1 != nil {
+				err1 = os.MkdirAll(path1, os.ModePerm)
+				if err1 != nil {
+					log.Println(err1)
+					return err1
+				}
+			}
+		}
+	}
+	for _, v := range zreader.File {
+		info := v.FileInfo()
+		path1 := path.Join(root, v.Name)
+		if !info.IsDir() {
+			//修复缺失的目录
+			err1 := mkdir_p(path1)
+			if err1 != nil {
+				log.Println(err1)
+				return err1
+			}
+			f1, err1 := os.Create(path1)
+			if err1 != nil {
+				log.Println(err1)
+				return err1
+			}
+			rd1, _ := v.Open()
+			_, err1 = io.Copy(f1, rd1)
+			if err1 != nil {
+				log.Println(err1)
+				return err1
+			}
+			rd1.Close()
+			f1.Close()
+			os.Chtimes(path1, v.Modified, v.Modified)
+		}
+	}
+	for _, v := range zreader.File {
+		info := v.FileInfo()
+		path1 := path.Join(root, v.Name)
+		if info.IsDir() {
+			os.Chtimes(path1, v.Modified, v.Modified)
+		}
+	}
+	return nil
 }

@@ -3,6 +3,7 @@ package main
 import (
 	"archive/zip"
 	"bytes"
+	"compress/gzip"
 	"crypto/rand"
 	"encoding/hex"
 	"errors"
@@ -29,6 +30,11 @@ type Reply struct {
 	UpList  []string
 	DelList []string
 }
+type AppendData struct {
+	Key  int
+	Name string
+	Gz   []byte
+}
 
 type Ctlrpc int
 
@@ -38,6 +44,7 @@ var conf_file_dir = "conf/"
 
 func main() {
 	var conf1 = flag.String("conf", "local", "[-conf name] select special config file 'name.json'")
+	var mode1 = flag.String("mode", "rpc", "[-mode rpc/http] 纯rpc模式/rpc、http混合模式")
 	flag.Parse()
 
 	set_win_dir()
@@ -49,7 +56,16 @@ func main() {
 	root = cfg["root"]
 	host = cfg["host"]
 	var name1 = cfg["key"]
-	client, err := rpc.DialHTTPPath("tcp", host, "/mysync/ctlrpc")
+	var client *rpc.Client
+	var err error
+	if *mode1 == "http" {
+		fmt.Println("http mode")
+		client, err = rpc.DialHTTPPath("tcp", host, "/mysync/ctlrpc")
+	} else {
+		fmt.Println("http mode")
+		client, err = rpc.Dial("tcp", host)
+	}
+
 	if err != nil {
 		panic(err)
 	}
@@ -67,9 +83,16 @@ func main() {
 		for i, v := range uplist {
 			log.Printf("UPLOAD %v: %v\n", i+1, v)
 		}
-		key1 = uploadList(uplist, name1, key1)
-		if key1 == nil {
-			panic("upload list fail")
+		if *mode1 == "http" {
+			key1 = uploadList(uplist, name1, key1)
+			if key1 == nil {
+				panic("upload list fail")
+			}
+		} else {
+			err = rpcUploadList(client, uplist, name1, key1)
+			if err != nil {
+				panic(err)
+			}
 		}
 	}
 
@@ -261,4 +284,115 @@ func set_win_dir() {
 	conf1 := filepath.Join(dir1, "config/mysync/")
 	pri_key_dir = conf1
 	conf_file_dir = conf1
+}
+
+func rpcUploadList(rpc1 *rpc.Client, uplist []string, name1 string, k []byte) error {
+	upfile := zipList(uplist)
+	//Rpc CreateTempFile
+	//verify message
+	var b1 = make([]byte, 32)
+	io.ReadFull(rand.Reader, b1)
+	buf1 := bytes.NewBuffer(b1)
+	buf1.WriteString(name1)
+	//crypto message with received key
+	valid := mycrypto.AES256Encode(k, buf1.Bytes())
+	if valid == nil {
+		return errors.New("rpcUploadList: aes crypto error")
+	}
+	var arg1 = Args{valid, buf1.Bytes(), nil}
+	var fid int
+	err := rpc1.Call("Ctlrpc.CreateTempFile", &arg1, &fid)
+	if err != nil {
+		return err
+	}
+	//Rpc AppendFile
+	var arg2 = AppendData{fid, name1, nil}
+	var reply int
+	fp, err := os.Open(upfile)
+	if err != nil {
+		return err
+	}
+	defer os.Remove(upfile)
+	defer fp.Close()
+	block1 := make([]byte, 1024*1024*2)
+	buf2 := bytes.NewBufferString("")
+	zw1 := gzip.NewWriter(buf2)
+	var idx int
+	fmt.Printf("Send data: ")
+	for n, _ := fp.Read(block1); n > 0; n, _ = fp.Read(block1) {
+		zw1.Reset(buf2)
+		zw1.Write(block1[:n])
+		zw1.Flush()
+		arg2.Gz = buf2.Bytes()
+		err = rpc1.Call("Ctlrpc.AppendFile", &arg2, &reply)
+		if err != nil {
+			return err
+		}
+		buf2.Reset()
+		if reply != n {
+			return errors.New("AppendFile: send data not correct")
+		}
+		idx += 1
+		fmt.Printf("%v:%vK ", idx, reply/1024)
+	}
+	arg2.Gz = nil
+	err = rpc1.Call("Ctlrpc.FinishFile", &arg2, &reply)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+func zipList(uplist []string) string {
+	//create zip file
+	home := os.Getenv("HOME")
+	if len(home) == 0 {
+		//windows
+		home = "/"
+	}
+	dir1 := path.Join(home, ".tmp")
+	os.MkdirAll(dir1, os.ModePerm)
+	filename1 := path.Join(dir1, "up.zip")
+	fp, err := os.Create(filename1)
+	if err != nil {
+		log.Println(err)
+		return ""
+	}
+	defer fp.Close()
+	zf := zip.NewWriter(fp)
+	defer zf.Close()
+	os.Chdir(root)
+	for _, p := range uplist {
+		p1 := p
+		fp1, err := os.Open(p1)
+		if err != nil {
+			log.Println(err)
+			return ""
+		}
+		st1, err := fp1.Stat()
+		if err != nil {
+			log.Println(err)
+			return ""
+		}
+		fh, err := zip.FileInfoHeader(st1)
+		fh.Name = p1
+		//log.Println(fh.Name, st1.Name())
+		if err != nil {
+			log.Println(err)
+			return ""
+		}
+		fh.Method = zip.Deflate
+		fh.Modified = st1.ModTime()
+		f, err := zf.CreateHeader(fh)
+		if err != nil {
+			log.Println(err)
+			return ""
+		}
+		if st1.IsDir() {
+			fp1.Close()
+		} else {
+			io.Copy(f, fp1)
+			fp1.Close()
+		}
+	}
+	return filename1
 }
