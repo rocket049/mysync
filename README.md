@@ -8,6 +8,9 @@
 
 服务器和客户端的通讯使用`RPC`和`HTTP`，`RPC`进行控制，`HTTP`上传文件。
 
+2018-6-16更新： `mysync/mysyncd`都可以选择`http` 或者`rpc`模式，`rpc`模式不再用`"multipart/form-data"`方式上传文件，
+而是改用`rpc`方式（`gzip+gob`）上传，二者的工作模式必须相同。默认工作模式是 `rpc` ，使用参数`[-mode rpc/http]`修改工作模式。
+
 #### 安装教程
 
 1. 把`src`目录下的几个目录复制到`GOPATH/src`下面，然后编译。
