@@ -1,8 +1,8 @@
 package main
 
 import (
-	"mysync/mysyncd/mycrypto"
 	"flag"
+	"mysync/mysyncd/mycrypto"
 )
 
 func main() {
@@ -19,4 +19,3 @@ func main() {
 	}
 	return
 }
-
