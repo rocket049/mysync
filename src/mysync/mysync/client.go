@@ -2,6 +2,7 @@ package main
 
 import (
 	"archive/zip"
+	"bufio"
 	"bytes"
 	"compress/gzip"
 	"crypto/rand"
@@ -308,12 +309,13 @@ func rpcUploadList(rpc1 *rpc.Client, uplist []string, name1 string, k []byte) er
 	//Rpc AppendFile
 	var arg2 = AppendData{fid, name1, nil}
 	var reply int
-	fp, err := os.Open(upfile)
+	fp1, err := os.Open(upfile)
 	if err != nil {
 		return err
 	}
 	defer os.Remove(upfile)
-	defer fp.Close()
+	defer fp1.Close()
+	fp := bufio.NewReaderSize(fp1, 1024*1024*4)
 	block1 := make([]byte, 1024*1024*2)
 	buf2 := bytes.NewBufferString("")
 	zw1 := gzip.NewWriter(buf2)
