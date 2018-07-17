@@ -15,7 +15,7 @@
 
 1. 把`src`目录下的几个目录复制到`GOPATH/src`下面，然后编译。
 2. “附件”中有编译好的win32版本和linux_amd64版本，静态链接的，解压后可以直接运行。
-3. xxxx
+3. 百度网盘下载： [https://pan.baidu.com/s/103cgeSFOmPZFvVZOQYdDPw](https://pan.baidu.com/s/103cgeSFOmPZFvVZOQYdDPw)
 
 #### 使用说明
 
