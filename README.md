@@ -8,6 +8,8 @@
 
 服务器和客户端的通讯使用`RPC`和`HTTP`，`RPC`进行控制，`HTTP`上传文件。
 
+新更新：2018-11-4 增加 `tls` 安全连接。
+
 2018-6-16更新： `mysync/mysyncd`都可以选择`http` 或者`rpc`模式，`rpc`模式不再用`"multipart/form-data"`方式上传文件，
 而是改用`rpc`方式（`gzip+gob`）上传，二者的工作模式必须相同。默认工作模式是 `rpc` ，使用参数`[-mode rpc/http]`修改工作模式。
 
@@ -19,7 +21,15 @@
 
 #### 使用说明
 
-*linux*最新更新：2018-6-10
+*linux*最新更新：2018-11-4
+
+2018-11-4: `rpc` 连接增加 `tls` 安全连接特性
+
+*`TLS`配置证书的步骤：*
+
+1. 用`mysyncd/rootcas`目录中的`genca`程序生成`root-cert.pem、root-key.pem、root-pub.pem`。
+2. 服务端新建目录`HOME/config/mysyncd/rootcas`，然后把`root-cert.pem、root-key.pem`复制到`HOME/config/mysyncd/rootcas`；
+客户端新建目录`HOME/config/mysync/rootcas`，然后把`root-cert.pem`复制到`HOME/config/mysync/rootcas`。
 
 `linux`目录中有配置文件、Makefile样本。
 

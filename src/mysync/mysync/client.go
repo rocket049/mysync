@@ -6,11 +6,14 @@ import (
 	"bytes"
 	"compress/gzip"
 	"crypto/rand"
+	"crypto/tls"
+	"crypto/x509"
 	"encoding/hex"
 	"errors"
 	"flag"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"log"
 	"mysync/mysyncd/conf"
 	"mysync/mysyncd/files"
@@ -45,7 +48,7 @@ var conf_file_dir = "conf/"
 
 func main() {
 	var conf1 = flag.String("conf", "local", "[-conf name] select special config file 'name.json'")
-	var mode1 = flag.String("mode", "rpc", "[-mode rpc/http] 纯rpc模式/rpc、http混合模式")
+	var mode1 = flag.String("mode", "rpc", "[-mode rpc/http] 纯rpc模式/rpc(安全连接tls)、http混合模式")
 	flag.Parse()
 
 	set_win_dir()
@@ -63,8 +66,21 @@ func main() {
 		fmt.Println("http mode")
 		client, err = rpc.DialHTTPPath("tcp", host, "/mysync/ctlrpc")
 	} else {
-		fmt.Println("http mode")
-		client, err = rpc.Dial("tcp", host)
+		fmt.Println("rpc/tls mode")
+		var cfg tls.Config
+		roots := x509.NewCertPool()
+		pem, err := ioutil.ReadFile(path.Join(pri_key_dir, "rootcas/root-cert.pem"))
+		if err != nil {
+			log.Fatal("Read PEM error:%v\n", err)
+		}
+		roots.AppendCertsFromPEM(pem)
+		cfg.RootCAs = roots
+		conn1, err := tls.Dial("tcp", host, &cfg)
+		if err != nil {
+			log.Fatal(err)
+		}
+		defer conn1.Close()
+		client = rpc.NewClient(conn1)
 	}
 
 	if err != nil {

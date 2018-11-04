@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"compress/gzip"
 	"crypto/rand"
+	"crypto/tls"
 	"encoding/hex"
 	"errors"
 	"flag"
@@ -312,17 +313,25 @@ func (self *NullWriter) Close() {
 
 func main() {
 	var host = flag.String("host", ":6080", "[-host ip:port]: bind special address and port")
-	var mode1 = flag.String("mode", "rpc", "[-mode rpc/http] 纯rpc模式/rpc、http混合模式")
+	var mode1 = flag.String("mode", "rpc", "[-mode rpc/http] 纯rpc模式/rpc(安全连接tls)、http混合模式")
 	flag.Parse()
 	set_win_dir()
 	//set log not output
-	var null1 = new(NullWriter)
-	log.SetOutput(null1)
-	defer null1.Close()
+	//var null1 = new(NullWriter)
+	//log.SetOutput(null1)
+	//defer null1.Close()
+
+	//set tls config
+	cert, err := tls.LoadX509KeyPair(path.Join(pub_key_dir, "rootcas/root-cert.pem"),
+		path.Join(pub_key_dir, "rootcas/root-key.pem"))
+	if err != nil {
+		log.Fatal(err)
+	}
+	cfg := &tls.Config{Certificates: []tls.Certificate{cert}}
 
 	ctl := new(Ctlrpc)
 	if *mode1 == "http" {
-		fmt.Println("rpc http mode")
+		fmt.Println("http mode")
 		rpc1 := rpc.NewServer()
 		rpc1.Register(ctl)
 		http.HandleFunc("/mysync/upload", HandleUpload)
@@ -334,12 +343,12 @@ func main() {
 		defer l.Close()
 		go http.Serve(l, nil)
 	} else {
-		fmt.Println("rpc tcp mode")
+		fmt.Println("rpc/tls mode")
 		err := rpc.Register(ctl)
 		if err != nil {
 			panic(err)
 		}
-		l, e := net.Listen("tcp", *host)
+		l, e := tls.Listen("tcp", *host, cfg)
 		if e != nil {
 			log.Fatal("listen error:", e)
 		}
