@@ -11,7 +11,7 @@ mysync.exe:
 	go install mysync/mysync
 genkey.exe:
 	go install mysync/genkey
-genca:
+genca.exe:
 	go install mysync/genca
 
 	
