@@ -7,6 +7,7 @@ import (
 	"crypto/x509/pkix"
 	"encoding/pem"
 	"errors"
+	"flag"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -98,7 +99,7 @@ func GetParentCert(name string) (cert *x509.Certificate, privKey *rsa.PrivateKey
 	return
 }
 
-func saveKeyPair(name string, prik *rsa.PrivateKey) error {
+func saveKeyPair(name string, prik *rsa.PrivateKey, savePub bool) error {
 	var pubk rsa.PublicKey
 	pubk.N = prik.N
 	pubk.E = prik.E
@@ -117,18 +118,20 @@ func saveKeyPair(name string, prik *rsa.PrivateKey) error {
 	}
 	fp.Close()
 	//save public key
-	blk.Type = "RSA PUBLIC KEY"
-	file1 = name + "-pub.pem"
-	fp, err = os.Create(file1)
-	if err != nil {
-		panic(err)
+	if savePub {
+		blk.Type = "RSA PUBLIC KEY"
+		file1 = name + "-pub.pem"
+		fp, err = os.Create(file1)
+		if err != nil {
+			panic(err)
+		}
+		blk.Bytes = x509.MarshalPKCS1PublicKey(&pubk)
+		err = pem.Encode(fp, &blk)
+		if err != nil {
+			panic(err)
+		}
+		fp.Close()
 	}
-	blk.Bytes = x509.MarshalPKCS1PublicKey(&pubk)
-	err = pem.Encode(fp, &blk)
-	if err != nil {
-		panic(err)
-	}
-	fp.Close()
 	return nil
 }
 
@@ -150,11 +153,15 @@ func CreateTlsKeyPair(name, parent string) {
 		log.Fatalf("error creating cert: %v", err)
 	}
 	fmt.Printf("%s\n", rootCertPEM)
-	ioutil.WriteFile(name+"-cert.pem", []byte(rootCertPEM), os.ModePerm)
+	ioutil.WriteFile(name+"-cert.pem", []byte(rootCertPEM), 0644)
 	//fmt.Printf("%#x\n", rootCert.Signature) // 证书的签名信息
-	saveKeyPair(name, rootKey)
+	saveKeyPair(name, rootKey, false)
 }
 
 func main() {
-	CreateTlsKeyPair("root", "")
+	var name = flag.String("name", "new", "[-name ident] default: new")
+	var parent = flag.String("parent", "",
+		"[-parent parentKeyFilePrefix] default: null")
+	flag.Parse()
+	CreateTlsKeyPair(*name, *parent)
 }
