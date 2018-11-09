@@ -267,6 +267,9 @@ func rpcUploadList(rpc1 *rpc.Client, uplist []string, name1 string, k []byte) er
 		return err
 	}
 	//Rpc AppendFile
+	var size1, sent int
+	info1, _ := os.Stat(upfile)
+	size1 = int(info1.Size())
 	var arg2 = AppendData{fid, name1, nil}
 	var reply int
 	fp1, err := os.Open(upfile)
@@ -278,8 +281,8 @@ func rpcUploadList(rpc1 *rpc.Client, uplist []string, name1 string, k []byte) er
 	block1 := make([]byte, 1024*1024*2)
 	buf2 := bytes.NewBufferString("")
 	zw1 := gzip.NewWriter(buf2)
-	var idx int
-	fmt.Printf("Send data: ")
+	//var idx int
+	fmt.Printf("Size : %.1fM\n", float64(size1)/float64(1024*1024))
 	for n, _ := fp.Read(block1); n > 0; n, _ = fp.Read(block1) {
 		zw1.Reset(buf2)
 		zw1.Write(block1[:n])
@@ -293,9 +296,11 @@ func rpcUploadList(rpc1 *rpc.Client, uplist []string, name1 string, k []byte) er
 		if reply != n {
 			return errors.New("AppendFile: send data not correct")
 		}
-		idx += 1
-		fmt.Printf("%v:%vK ", idx, reply/1024)
+		//idx += 1
+		sent += n
+		fmt.Printf("\rSend: %d%%", (sent*100)/size1)
 	}
+	fmt.Printf("\n")
 	arg2.Gz = nil
 	err = rpc1.Call("Ctlrpc.FinishFile", &arg2, &reply)
 	if err != nil {
