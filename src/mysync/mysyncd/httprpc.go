@@ -317,9 +317,9 @@ func main() {
 	flag.Parse()
 	set_win_dir()
 	//set log not output
-	//var null1 = new(NullWriter)
-	//log.SetOutput(null1)
-	//defer null1.Close()
+	var null1 = new(NullWriter)
+	log.SetOutput(null1)
+	defer null1.Close()
 
 	//set tls config
 	cert, err := tls.LoadX509KeyPair(path.Join(pub_key_dir, "rootcas/root-cert.pem"),
