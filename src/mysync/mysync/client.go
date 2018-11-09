@@ -22,6 +22,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"time"
 )
 
 type Args struct {
@@ -71,7 +72,7 @@ func main() {
 		roots := x509.NewCertPool()
 		pem, err := ioutil.ReadFile(path.Join(pri_key_dir, "rootcas/root-cert.pem"))
 		if err != nil {
-			log.Fatal("Read PEM error:%v\n", err)
+			log.Fatalf("Read PEM error:%v\n", err)
 		}
 		roots.AppendCertsFromPEM(pem)
 		cfg.RootCAs = roots
@@ -187,65 +188,8 @@ func syncDel(rpc1 *rpc.Client, name1 string, k []byte) (uplist []string, retk []
 //upload list and return new key
 func uploadList(uplist []string, name1 string, k []byte) []byte {
 	//create zip file
-	home := os.Getenv("HOME")
-	if len(home) == 0 {
-		//windows
-		home = "/"
-	}
-	dir1 := path.Join(home, ".tmp")
-	os.MkdirAll(dir1, os.ModePerm)
-	filename1 := path.Join(dir1, "up.zip")
-	fp, err := os.Create(filename1)
-	if err != nil {
-		log.Println(err)
-		return nil
-	}
-	defer os.Remove(filename1)
-	zf := zip.NewWriter(fp)
-	os.Chdir(root)
-	for _, p := range uplist {
-		p1 := p
-		fp1, err := os.Open(p1)
-		if err != nil {
-			zf.Close()
-			fp.Close()
-			log.Println(err)
-			return nil
-		}
-		st1, err := fp1.Stat()
-		if err != nil {
-			zf.Close()
-			fp.Close()
-			log.Println(err)
-			return nil
-		}
-		fh, err := zip.FileInfoHeader(st1)
-		fh.Name = p1
-		//log.Println(fh.Name, st1.Name())
-		if err != nil {
-			zf.Close()
-			fp.Close()
-			log.Println(err)
-			return nil
-		}
-		fh.Method = zip.Deflate
-		fh.Modified = st1.ModTime()
-		f, err := zf.CreateHeader(fh)
-		if err != nil {
-			zf.Close()
-			fp.Close()
-			log.Println(err)
-			return nil
-		}
-		if st1.IsDir() {
-			fp1.Close()
-		} else {
-			io.Copy(f, fp1)
-			fp1.Close()
-		}
-	}
-	zf.Close()
-	fp.Close()
+	filename1 := zipList(uplist)
+
 	//valid and upload
 	var b1 = make([]byte, 32)
 	io.ReadFull(rand.Reader, b1)
@@ -258,7 +202,7 @@ func uploadList(uplist []string, name1 string, k []byte) []byte {
 		return nil
 	}
 	var url = fmt.Sprintf("http://%v/mysync/upload", host)
-	ret := files.PostFile(filename1, url, &files.MyValid{valid, msg})
+	ret := files.PostFile(filename1, url, &files.MyValid{Sig: valid, Msg: msg})
 	if ret == nil {
 		log.Println("error upload zip")
 		return nil
@@ -327,9 +271,8 @@ func rpcUploadList(rpc1 *rpc.Client, uplist []string, name1 string, k []byte) er
 	var reply int
 	fp1, err := os.Open(upfile)
 	if err != nil {
-		return err
+		return errors.New(fmt.Sprintf("open %s:%v", upfile, err))
 	}
-	defer os.Remove(upfile)
 	defer fp1.Close()
 	fp := bufio.NewReaderSize(fp1, 1024*1024*4)
 	block1 := make([]byte, 1024*1024*2)
@@ -362,14 +305,19 @@ func rpcUploadList(rpc1 *rpc.Client, uplist []string, name1 string, k []byte) er
 }
 func zipList(uplist []string) string {
 	//create zip file
-	home := os.Getenv("HOME")
-	if len(home) == 0 {
-		//windows
-		home = "/"
-	}
-	dir1 := path.Join(home, ".tmp")
+	dir1 := filepath.Join(root, "_backup")
 	os.MkdirAll(dir1, os.ModePerm)
-	filename1 := path.Join(dir1, "up.zip")
+
+	now1 := time.Now()
+	var filename1 string
+	for i := 1; true; i++ {
+		backupName := fmt.Sprintf("up%s-%d%s", now1.Format("20060102"), i, ".zip")
+		_, err := os.Stat(filepath.Join(dir1, backupName))
+		if err != nil {
+			filename1 = filepath.Join(dir1, backupName)
+			break
+		}
+	}
 	fp, err := os.Create(filename1)
 	if err != nil {
 		log.Println(err)
