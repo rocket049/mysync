@@ -25,7 +25,12 @@ import (
 	"path"
 	"path/filepath"
 	"sync"
+	"time"
 )
+
+func init() {
+	mr.Seed(time.Now().Unix())
+}
 
 type Args struct {
 	Valid   []byte
