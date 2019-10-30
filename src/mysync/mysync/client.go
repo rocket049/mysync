@@ -225,7 +225,12 @@ func rpcUploadList(rpc1 *rpc.Client, uplist []string, name1 string, k []byte) er
 	buf2 := bytes.NewBufferString("")
 	zw1 := gzip.NewWriter(buf2)
 	//var idx int
-	fmt.Printf("Size : %.1fM\n", float64(size1)/float64(1024*1024))
+	if size1 < 1024*1024 {
+		fmt.Printf("Size : %.1fK\n", float64(size1)/float64(1024))
+	} else {
+		fmt.Printf("Size : %.1fM\n", float64(size1)/float64(1024*1024))
+	}
+
 	for n, _ := fp.Read(block1); n > 0; n, _ = fp.Read(block1) {
 		zw1.Reset(buf2)
 		zw1.Write(block1[:n])
