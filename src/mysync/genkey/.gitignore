@@ -1,1 +1,3 @@
 genkey
+*.key
+*.pub
