@@ -5,6 +5,9 @@
 
 服务器和客户端的通讯使用`TLS`安全连接进行`RPC`调用。
 
+#### 百度网盘下载
+[https://pan.baidu.com/s/103cgeSFOmPZFvVZOQYdDPw](https://pan.baidu.com/s/103cgeSFOmPZFvVZOQYdDPw)
+
 #### 系统构架
 本软件有4个程序构成：
 
