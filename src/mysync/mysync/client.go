@@ -45,8 +45,8 @@ var host string
 
 const root = "."
 
-const pri_key_dir = ".mysync/"
-const conf_file_dir = ".mysync/"
+const pri_key_dir = "_mysync/"
+const conf_file_dir = "_mysync/"
 
 func main() {
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
