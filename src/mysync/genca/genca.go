@@ -56,6 +56,40 @@ func createRootKey() (*rsa.PrivateKey, *x509.Certificate) {
 	return rootKey, rootCertTmpl
 }
 
+func createRootKeyWithIP(ip string) (*rsa.PrivateKey, *x509.Certificate) {
+	//生成一对新的公私钥
+	rootKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		log.Fatalf("generating random key: %v", err)
+	}
+	rootCertTmpl, err := CertTemplate()
+	if err != nil {
+		log.Fatalf("creating cert template: %v", err)
+	} //在模板的基础上增加一些新的证书信息
+	rootCertTmpl.IsCA = true //是否是CA
+	rootCertTmpl.KeyUsage = x509.KeyUsageCertSign | x509.KeyUsageDigitalSignature
+	rootCertTmpl.ExtKeyUsage = []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth, x509.ExtKeyUsageClientAuth}
+	rootCertTmpl.IPAddresses = []net.IP{net.ParseIP(ip)}
+	return rootKey, rootCertTmpl
+}
+
+func createRootKeyWithName(name string) (*rsa.PrivateKey, *x509.Certificate) {
+	//生成一对新的公私钥
+	rootKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		log.Fatalf("generating random key: %v", err)
+	}
+	rootCertTmpl, err := CertTemplate()
+	if err != nil {
+		log.Fatalf("creating cert template: %v", err)
+	} //在模板的基础上增加一些新的证书信息
+	rootCertTmpl.IsCA = true //是否是CA
+	rootCertTmpl.KeyUsage = x509.KeyUsageCertSign | x509.KeyUsageDigitalSignature
+	rootCertTmpl.ExtKeyUsage = []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth, x509.ExtKeyUsageClientAuth}
+	rootCertTmpl.DNSNames = []string{name}
+	return rootKey, rootCertTmpl
+}
+
 //CreateCert 参数：
 //    template   证书申请者的证书模板
 //    parent     父证书
@@ -99,14 +133,20 @@ func GetParentCert(name string) (cert *x509.Certificate, privKey *rsa.PrivateKey
 	return
 }
 
-func saveKeyPair(name string, prik *rsa.PrivateKey, savePub bool) error {
+func saveKeyPair(name, ip string, prik *rsa.PrivateKey, savePub bool) error {
 	var pubk rsa.PublicKey
 	pubk.N = prik.N
 	pubk.E = prik.E
 	// save private key
 	var blk pem.Block
 	blk.Type = "RSA PRIVATE KEY"
-	file1 := name + "-key.pem"
+	file1 := "key.pem"
+	if len(name) > 0 {
+		file1 = name + "-key.pem"
+	} else {
+		file1 = ip + "-key.pem"
+	}
+
 	fp, err := os.Create(file1)
 	if err != nil {
 		panic(err)
@@ -120,7 +160,13 @@ func saveKeyPair(name string, prik *rsa.PrivateKey, savePub bool) error {
 	//save public key
 	if savePub {
 		blk.Type = "RSA PUBLIC KEY"
-		file1 = name + "-pub.pem"
+		file1 = "pub.pem"
+		if len(name) > 0 {
+			file1 = name + "-pub.pem"
+		} else {
+			file1 = ip + "-pub.pem"
+		}
+
 		fp, err = os.Create(file1)
 		if err != nil {
 			panic(err)
@@ -136,10 +182,17 @@ func saveKeyPair(name string, prik *rsa.PrivateKey, savePub bool) error {
 }
 
 //CreateTlsKeyPair name:输出文件前缀；parent：签名用的根证书前缀
-func CreateTlsKeyPair(name, parent string) {
+func CreateTlsKeyPair(name, ip, parent string) {
 	var rootCertPEM []byte
+	var rootKey *rsa.PrivateKey
+	var rootCertTmpl *x509.Certificate
 	var err error
-	rootKey, rootCertTmpl := createRootKey()
+	if len(name) > 0 {
+		rootKey, rootCertTmpl = createRootKeyWithName(name)
+	} else {
+		rootKey, rootCertTmpl = createRootKeyWithIP(ip)
+	}
+
 	if len(parent) == 0 {
 		_, rootCertPEM, err = CreateCert(rootCertTmpl, rootCertTmpl,
 			&rootKey.PublicKey, rootKey)
@@ -153,15 +206,22 @@ func CreateTlsKeyPair(name, parent string) {
 		log.Fatalf("error creating cert: %v", err)
 	}
 	fmt.Printf("%s\n", rootCertPEM)
-	ioutil.WriteFile(name+"-cert.pem", []byte(rootCertPEM), 0644)
+	pemName := "cert.pem"
+	if len(name) > 0 {
+		pemName = name + "-cert.pem"
+	} else {
+		pemName = ip + "-cert.pem"
+	}
+	ioutil.WriteFile(pemName, []byte(rootCertPEM), 0644)
 	//fmt.Printf("%#x\n", rootCert.Signature) // 证书的签名信息
-	saveKeyPair(name, rootKey, false)
+	saveKeyPair(name, ip, rootKey, false)
 }
 
 func main() {
-	var name = flag.String("name", "new", "[-name ident] default: new")
+	var name = flag.String("name", "", "[-name dnsname] default: ''")
+	var ip = flag.String("ip", "127.0.0.1", "[-ip IP address] default: 127.0.0.1")
 	var parent = flag.String("parent", "",
 		"[-parent parentKeyFilePrefix] default: null")
 	flag.Parse()
-	CreateTlsKeyPair(*name, *parent)
+	CreateTlsKeyPair(*name, *ip, *parent)
 }

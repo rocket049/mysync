@@ -6,7 +6,6 @@ import (
 	"compress/gzip"
 	"crypto/rand"
 	"crypto/tls"
-	"encoding/hex"
 	"errors"
 	"flag"
 	"fmt"
@@ -17,8 +16,6 @@ import (
 	"mysync/mysyncd/conf"
 	"mysync/mysyncd/files"
 	"mysync/mysyncd/mycrypto"
-	"net"
-	"net/http"
 	"net/rpc"
 	"os"
 	"os/signal"
@@ -55,11 +52,13 @@ var trans map[int]*os.File = make(map[int]*os.File)
 
 func set_win_dir() {
 	if len(os.Getenv("windir")) == 0 {
+		//linux
 		home := os.Getenv("HOME")
 		pub_key_dir = path.Join(home, "config/mysyncd/")
 		conf_file_dir = path.Join(home, "config/mysyncd/")
 		return
 	}
+	//windows
 	log.Println("OS: Windows")
 	exe1, _ := os.Executable()
 	dir1 := filepath.Dir(exe1)
@@ -318,48 +317,36 @@ func (self *NullWriter) Close() {
 
 func main() {
 	var host = flag.String("host", ":6080", "[-host ip:port]: bind special address and port")
-	var mode1 = flag.String("mode", "rpc", "[-mode rpc/http] 纯rpc模式/rpc(安全连接tls)、http混合模式")
+
 	flag.Parse()
 	set_win_dir()
 	//set log not output
-	var null1 = new(NullWriter)
-	log.SetOutput(null1)
-	defer null1.Close()
+	//var null1 = new(NullWriter)
+	//log.SetOutput(null1)
+	//defer null1.Close()
+	log.SetFlags(log.LstdFlags | log.Lshortfile)
 
 	//set tls config
-	cert, err := tls.LoadX509KeyPair(path.Join(pub_key_dir, "rootcas/root-cert.pem"),
-		path.Join(pub_key_dir, "rootcas/root-key.pem"))
+	cert, err := tls.LoadX509KeyPair(path.Join(pub_key_dir, "rootcas/cert.pem"),
+		path.Join(pub_key_dir, "rootcas/key.pem"))
 	if err != nil {
 		log.Fatal(err)
 	}
 	cfg := &tls.Config{Certificates: []tls.Certificate{cert}}
 
 	ctl := new(Ctlrpc)
-	if *mode1 == "http" {
-		fmt.Println("http mode")
-		rpc1 := rpc.NewServer()
-		rpc1.Register(ctl)
-		http.HandleFunc("/mysync/upload", HandleUpload)
-		rpc1.HandleHTTP("/mysync/ctlrpc", "/mysync/dbgrpc")
-		l, e := net.Listen("tcp", *host)
-		if e != nil {
-			log.Fatal("listen error:", e)
-		}
-		defer l.Close()
-		go http.Serve(l, nil)
-	} else {
-		fmt.Println("rpc/tls mode")
-		err := rpc.Register(ctl)
-		if err != nil {
-			panic(err)
-		}
-		l, e := tls.Listen("tcp", *host, cfg)
-		if e != nil {
-			log.Fatal("listen error:", e)
-		}
-		defer l.Close()
-		go rpc.Accept(l)
+
+	err = rpc.Register(ctl)
+	if err != nil {
+		panic(err)
 	}
+	l, e := tls.Listen("tcp", *host, cfg)
+	if e != nil {
+		log.Fatal("listen error:", e)
+	}
+	defer l.Close()
+	go rpc.Accept(l)
+
 	wait_sig()
 }
 
@@ -375,127 +362,6 @@ func mkdir_p(p string) error {
 		return nil
 	}
 	return os.MkdirAll(d, os.ModePerm)
-}
-
-//recive zip file contain all upload list
-func HandleUpload(resp http.ResponseWriter, req *http.Request) {
-	r, err := req.MultipartReader()
-	if err != nil {
-		log.Println(err)
-		resp.WriteHeader(200)
-		resp.Write([]byte("fail get multiform"))
-		return
-	}
-	form1, err := r.ReadForm(5 * 1024 * 1024)
-	if err != nil {
-		log.Println("ReadForm:", err)
-		resp.WriteHeader(200)
-		resp.Write([]byte("fail read form"))
-		return
-	}
-	sig, _ := hex.DecodeString(form1.Value["sig"][0])
-	msg, _ := hex.DecodeString(form1.Value["msg"][0])
-	//log.Println(msg, req.FormValue("msg"))
-	if len(msg) < 33 {
-		resp.WriteHeader(200)
-		resp.Write([]byte("fail verify"))
-		return
-	}
-	name1 := string(msg[32:])
-	k1 := cfg.GetKey(name1)
-	vmsg := mycrypto.AES256Decode(k1, sig)
-	if bytes.Compare(vmsg, msg) != 0 {
-		resp.WriteHeader(200)
-		resp.Write([]byte("fail verify"))
-		return
-	}
-	fh1, ok := form1.File["upfile"]
-	if !ok {
-		log.Println(err)
-		resp.WriteHeader(200)
-		resp.Write([]byte("fail upload"))
-		return
-	}
-	file1, _ := fh1[0].Open()
-	root := cfg.GetRoot(name1)
-	tmp := path.Join(os.Getenv("HOME"), ".tmp")
-	os.MkdirAll(tmp, os.ModePerm)
-	tmpzip, _ := ioutil.TempFile(tmp, "up")
-	defer os.Remove(tmpzip.Name())
-	defer tmpzip.Close()
-	size1, _ := io.Copy(tmpzip, file1)
-	file1.Close()
-	tmpzip.Seek(0, 0)
-	zreader, err := zip.NewReader(tmpzip, size1)
-	if err != nil {
-		log.Println(err)
-		resp.WriteHeader(200)
-		resp.Write([]byte("fail unzip"))
-		return
-	}
-	for _, v := range zreader.File {
-		info := v.FileInfo()
-		path1 := path.Join(root, v.Name)
-		log.Printf("UPLOAD: %v\n", path1)
-		if info.IsDir() {
-			_, err1 := os.Stat(path1)
-			if err1 != nil {
-				err1 = os.MkdirAll(path1, os.ModePerm)
-				if err1 != nil {
-					log.Println(err1)
-					resp.WriteHeader(200)
-					resp.Write([]byte("fail mkdir"))
-					return
-				}
-			}
-		}
-	}
-	for _, v := range zreader.File {
-		info := v.FileInfo()
-		path1 := path.Join(root, v.Name)
-		if !info.IsDir() {
-			//修复缺失的目录
-			err1 := mkdir_p(path1)
-			if err1 != nil {
-				log.Println(err1)
-				resp.WriteHeader(200)
-				resp.Write([]byte("fail mkdir"))
-				return
-			}
-			f1, err1 := os.Create(path1)
-			if err1 != nil {
-				log.Println(err1)
-				resp.WriteHeader(200)
-				resp.Write([]byte("fail create"))
-				return
-			}
-			rd1, _ := v.Open()
-			_, err1 = io.Copy(f1, rd1)
-			if err1 != nil {
-				log.Println(err1)
-				resp.WriteHeader(200)
-				resp.Write([]byte("fail unzip file"))
-				return
-			}
-			rd1.Close()
-			f1.Close()
-			os.Chtimes(path1, v.Modified, v.Modified)
-		}
-	}
-	for _, v := range zreader.File {
-		info := v.FileInfo()
-		path1 := path.Join(root, v.Name)
-		if info.IsDir() {
-			os.Chtimes(path1, v.Modified, v.Modified)
-		}
-	}
-	//return new key crypto with old key
-	var k = make([]byte, 32)
-	io.ReadFull(rand.Reader, k)
-	ck := hex.EncodeToString(mycrypto.AES256Encode(k1, k))
-	cfg.SetKey(name1, k)
-	resp.WriteHeader(200)
-	resp.Write([]byte("ok " + ck))
 }
 
 func UnZipFile(filename, name1 string) error {

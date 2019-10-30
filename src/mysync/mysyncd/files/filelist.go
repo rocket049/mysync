@@ -23,7 +23,12 @@ var start_pos int
 
 func GetFileMap(rootpath string) (map[string]FileDesc, error) {
 	file_map = make(map[string]FileDesc)
-	start_pos = len(rootpath)
+	if rootpath == "." {
+		start_pos = 0
+	} else {
+		start_pos = len(rootpath)
+	}
+
 	err := filepath.Walk(rootpath, walker)
 	if err != nil {
 		log.Printf("prevent panic by handling failure accessing a path %q: %v\n", rootpath, err)

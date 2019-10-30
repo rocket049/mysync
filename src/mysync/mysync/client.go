@@ -8,9 +8,7 @@ import (
 	"crypto/rand"
 	"crypto/tls"
 	"crypto/x509"
-	"encoding/hex"
 	"errors"
-	"flag"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -43,46 +41,39 @@ type AppendData struct {
 
 type Ctlrpc int
 
-var host, root string
-var pri_key_dir = "conf/"
-var conf_file_dir = "conf/"
+var host string
+
+const root = "."
+
+const pri_key_dir = ".mysync/"
+const conf_file_dir = ".mysync/"
 
 func main() {
-	var conf1 = flag.String("conf", "local", "[-conf name] select special config file 'name.json'")
-	var mode1 = flag.String("mode", "rpc", "[-mode rpc/http] 纯rpc模式/rpc(安全连接tls)、http混合模式")
-	flag.Parse()
-
-	set_win_dir()
-
-	var cfg = conf.ReadJSON(path.Join(conf_file_dir, *conf1+".json"))
-	if cfg == nil {
-		panic("No config " + *conf1 + ".json")
+	log.SetFlags(log.LstdFlags | log.Lshortfile)
+	var cfg1 = conf.ReadJSON(path.Join(conf_file_dir, "config.json"))
+	if cfg1 == nil {
+		panic("No config.json ")
 	}
-	root = cfg["root"]
-	host = cfg["host"]
-	var name1 = cfg["key"]
+
+	host = cfg1["host"]
+	var name1 = cfg1["key"]
 	var client *rpc.Client
 	var err error
-	if *mode1 == "http" {
-		fmt.Println("http mode")
-		client, err = rpc.DialHTTPPath("tcp", host, "/mysync/ctlrpc")
-	} else {
-		fmt.Println("rpc/tls mode")
-		var cfg tls.Config
-		roots := x509.NewCertPool()
-		pem, err := ioutil.ReadFile(path.Join(pri_key_dir, "rootcas/root-cert.pem"))
-		if err != nil {
-			log.Fatalf("Read PEM error:%v\n", err)
-		}
-		roots.AppendCertsFromPEM(pem)
-		cfg.RootCAs = roots
-		conn1, err := tls.Dial("tcp", host, &cfg)
-		if err != nil {
-			log.Fatal(err)
-		}
-		defer conn1.Close()
-		client = rpc.NewClient(conn1)
+
+	var cfg tls.Config
+	roots := x509.NewCertPool()
+	pem, err := ioutil.ReadFile(path.Join(pri_key_dir, "cert.pem"))
+	if err != nil {
+		log.Fatalf("Read PEM error:%v\n", err)
 	}
+	roots.AppendCertsFromPEM(pem)
+	cfg.RootCAs = roots
+	conn1, err := tls.Dial("tcp", host, &cfg)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer conn1.Close()
+	client = rpc.NewClient(conn1)
 
 	if err != nil {
 		panic(err)
@@ -101,17 +92,12 @@ func main() {
 		for i, v := range uplist {
 			log.Printf("UPLOAD %v: %v\n", i+1, v)
 		}
-		if *mode1 == "http" {
-			key1 = uploadList(uplist, name1, key1)
-			if key1 == nil {
-				panic("upload list fail")
-			}
-		} else {
-			err = rpcUploadList(client, uplist, name1, key1)
-			if err != nil {
-				panic(err)
-			}
+
+		err = rpcUploadList(client, uplist, name1, key1)
+		if err != nil {
+			panic(err)
 		}
+
 	}
 
 	err = logout(client, name1, key1)
@@ -185,37 +171,6 @@ func syncDel(rpc1 *rpc.Client, name1 string, k []byte) (uplist []string, retk []
 	}
 }
 
-//upload list and return new key
-func uploadList(uplist []string, name1 string, k []byte) []byte {
-	//create zip file
-	filename1 := zipList(uplist)
-
-	//valid and upload
-	var b1 = make([]byte, 32)
-	io.ReadFull(rand.Reader, b1)
-	buf1 := bytes.NewBuffer(b1)
-	buf1.WriteString(name1)
-	msg := buf1.Bytes()
-	valid := mycrypto.AES256Encode(k, msg)
-	if valid == nil {
-		log.Println("error AES256Encode")
-		return nil
-	}
-	var url = fmt.Sprintf("http://%v/mysync/upload", host)
-	ret := files.PostFile(filename1, url, &files.MyValid{Sig: valid, Msg: msg})
-	if ret == nil {
-		log.Println("error upload zip")
-		return nil
-	}
-	rets := string(ret)
-	res, err := hex.DecodeString(rets)
-	if err != nil {
-		log.Println(err)
-		return nil
-	}
-	return mycrypto.AES256Decode(k, res)
-}
-
 func logout(rpc1 *rpc.Client, name1 string, k []byte) error {
 	var b1 = make([]byte, 32)
 	io.ReadFull(rand.Reader, b1)
@@ -230,21 +185,6 @@ func logout(rpc1 *rpc.Client, name1 string, k []byte) error {
 	err := rpc1.Call("Ctlrpc.Logout", &arg, &reply)
 	log.Println(reply)
 	return err
-}
-
-func set_win_dir() {
-	if len(os.Getenv("windir")) == 0 {
-		home := os.Getenv("HOME")
-		pri_key_dir = path.Join(home, "config/mysync/")
-		conf_file_dir = path.Join(home, "config/mysync/")
-		return
-	}
-	log.Println("OS: Windows")
-	exe1, _ := os.Executable()
-	dir1 := filepath.Dir(exe1)
-	conf1 := filepath.Join(dir1, "config/mysync/")
-	pri_key_dir = conf1
-	conf_file_dir = conf1
 }
 
 func rpcUploadList(rpc1 *rpc.Client, uplist []string, name1 string, k []byte) error {
@@ -268,7 +208,10 @@ func rpcUploadList(rpc1 *rpc.Client, uplist []string, name1 string, k []byte) er
 	}
 	//Rpc AppendFile
 	var size1, sent int
-	info1, _ := os.Stat(upfile)
+	info1, err := os.Stat(upfile)
+	if err != nil {
+		return err
+	}
 	size1 = int(info1.Size())
 	var arg2 = AppendData{fid, name1, nil}
 	var reply int
@@ -309,6 +252,9 @@ func rpcUploadList(rpc1 *rpc.Client, uplist []string, name1 string, k []byte) er
 	return nil
 }
 func zipList(uplist []string) string {
+	if len(uplist) == 0 {
+		return ""
+	}
 	//create zip file
 	dir1 := filepath.Join(root, "_backup")
 	os.MkdirAll(dir1, os.ModePerm)
