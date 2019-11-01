@@ -5,8 +5,17 @@
 
 服务器和客户端的通讯使用`TLS`安全连接进行`RPC`调用。
 
+#### 源代码地址
+- [github.com](https://github.com/rocket049/mysync)
+- [gitee.com](https://gitee.com/rocket049/mysync)
+
 #### 百度网盘下载
 [https://pan.baidu.com/s/103cgeSFOmPZFvVZOQYdDPw](https://pan.baidu.com/s/103cgeSFOmPZFvVZOQYdDPw)
+
+#### 算法说明
+- 首先由客户端获取本地目录的文件列表，并且逐一计算各个文件的`MD5`值，然后把文件名、`MD5`列表发送到服务器。
+- 接着服务器也计算服务器上的文件、`MD5`列表，根据各个文件的`MD5`与客户端上传的列表进行比较，找出被客户端修改、新增、删除了的文件，然后删除已被客户端删除的文件，并且向客户端返回修改、新增文件列表。
+- 最后客户端把已经修改、新增的文件压缩打包后上传到服务器，服务器解开压缩包，更新服务器上的文件夹内容。
 
 #### 系统构架
 本软件有4个程序构成：
