@@ -214,6 +214,7 @@ func (t *Ctlrpc) SyncDel(arg *Args, res *Reply) error {
 	}
 	flist := cfg.GetList(name1)
 	up1, del1 := files.DiffList(arg.FileMap, flist)
+	//temp save filemap
 	path1 := cfg.GetRoot(name1)
 	for _, v := range del1 {
 		p1 := path.Join(path1, v)
@@ -297,7 +298,9 @@ func (t *Ctlrpc) FinishFile(arg *AppendData, reply *int) error {
 	defer os.Remove(pathname1)
 	//unzip
 	*reply = 1
-	return UnZipFile(pathname1, arg.Name)
+	err := UnZipFile(pathname1, arg.Name)
+	//save filemap
+	return err
 }
 
 type NullWriter struct {

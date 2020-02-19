@@ -18,44 +18,14 @@ type FileDesc struct {
 	MD5      []byte
 }
 
-var file_map map[string]FileDesc
-var start_pos int
-
-func GetFileMap(rootpath string) (map[string]FileDesc, error) {
-	file_map = make(map[string]FileDesc)
-	if rootpath == "." {
-		start_pos = 0
-	} else {
-		start_pos = len(rootpath)
-	}
-
-	err := filepath.Walk(rootpath, walker)
-	if err != nil {
-		log.Printf("prevent panic by handling failure accessing a path %q: %v\n", rootpath, err)
-		return nil, err
-	} else {
-		return file_map, nil
-	}
+type DirWalker struct {
+	FileMap  map[string]FileDesc
+	StartPos int
 }
 
-func GetFileMD5(pathname string) []byte {
-	f, err := os.Open(pathname)
-	if err != nil {
-		log.Println(err)
-		return nil
-	}
-	defer f.Close()
-	h := md5.New()
-	if _, err := io.Copy(h, f); err != nil {
-		log.Println(err)
-		return nil
-	}
-	res1 := h.Sum(nil)
-	return res1[:]
-}
-func walker(path1 string, info os.FileInfo, err error) error {
+func (p *DirWalker) Walker(path1 string, info os.FileInfo, err error) error {
 	var fd1 FileDesc
-	upath := GetUnixPath(path1[start_pos:])
+	upath := GetUnixPath(path1[p.StartPos:])
 	//name1 := filepath.Base(upath)
 	if len(upath) == 0 {
 		return nil
@@ -74,9 +44,72 @@ func walker(path1 string, info os.FileInfo, err error) error {
 		fd1.Size = int(info.Size())
 		fd1.MD5 = GetFileMD5(path1)
 	}
-	file_map[upath] = fd1
+	p.FileMap[upath] = fd1
 	return nil
 }
+
+//var file_map map[string]FileDesc
+//var start_pos int
+
+func GetFileMap(rootpath string) (map[string]FileDesc, error) {
+	//file_map = make(map[string]FileDesc)
+	w := new(DirWalker)
+	w.FileMap = make(map[string]FileDesc)
+	if rootpath == "." {
+		w.StartPos = 0
+	} else {
+		w.StartPos = len(rootpath)
+	}
+
+	err := filepath.Walk(rootpath, w.Walker)
+	if err != nil {
+		log.Printf("prevent panic by handling failure accessing a path %q: %v\n", rootpath, err)
+		return nil, err
+	} else {
+		return w.FileMap, nil
+	}
+}
+
+func GetFileMD5(pathname string) []byte {
+	f, err := os.Open(pathname)
+	if err != nil {
+		log.Println(err)
+		return nil
+	}
+	defer f.Close()
+	h := md5.New()
+	if _, err := io.Copy(h, f); err != nil {
+		log.Println(err)
+		return nil
+	}
+	res1 := h.Sum(nil)
+	return res1[:]
+}
+
+// func walker(path1 string, info os.FileInfo, err error) error {
+// 	var fd1 FileDesc
+// 	upath := GetUnixPath(path1[start_pos:])
+// 	//name1 := filepath.Base(upath)
+// 	if len(upath) == 0 {
+// 		return nil
+// 	}
+// 	if upath[:1] == "." || upath[:1] == "_" {
+// 		return nil
+// 	}
+// 	if info.IsDir() {
+// 		fd1.Pathname = upath
+// 		fd1.Mtime = time.Date(1927, time.November, 10, 23, 0, 0, 0, time.UTC)
+// 		fd1.Size = -1
+// 		fd1.MD5 = nil
+// 	} else {
+// 		fd1.Pathname = upath
+// 		fd1.Mtime = info.ModTime()
+// 		fd1.Size = int(info.Size())
+// 		fd1.MD5 = GetFileMD5(path1)
+// 	}
+// 	file_map[upath] = fd1
+// 	return nil
+// }
 
 //DiffList: return upload_list,del_list
 func DiffList(src_list, dist_list map[string]FileDesc) (up, del []string) {
