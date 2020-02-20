@@ -6,6 +6,7 @@ import (
 	"compress/gzip"
 	"crypto/rand"
 	"crypto/tls"
+	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
@@ -49,6 +50,8 @@ var filemap map[string]map[string]files.FileDesc = make(map[string]map[string]fi
 var aeskey map[string][]byte = make(map[string][]byte)
 var root map[string]string = make(map[string]string)
 var trans map[int]*os.File = make(map[int]*os.File)
+
+const descName = "_desc.json"
 
 func set_win_dir() {
 	if len(os.Getenv("windir")) == 0 {
@@ -188,7 +191,7 @@ func (t *Ctlrpc) Login(arg *Args, reply *[]byte) error {
 	if ok == false {
 		return errors.New("Path error on Server")
 	}
-	flist, err := files.GetFileMap(path1)
+	flist, err := GetFileMap(path1)
 	if err != nil {
 		return err
 	}
@@ -214,7 +217,7 @@ func (t *Ctlrpc) SyncDel(arg *Args, res *Reply) error {
 	}
 	flist := cfg.GetList(name1)
 	up1, del1 := files.DiffList(arg.FileMap, flist)
-	//temp save filemap
+
 	path1 := cfg.GetRoot(name1)
 	for _, v := range del1 {
 		p1 := path.Join(path1, v)
@@ -231,6 +234,8 @@ func (t *Ctlrpc) SyncDel(arg *Args, res *Reply) error {
 	res.Valid = ck
 	//asekey[name1] = k
 	cfg.SetKey(name1, k)
+	//temp save filemap
+	cfg.SetList(name1, arg.FileMap)
 	return nil
 }
 func (t *Ctlrpc) Logout(arg *Args, res *string) error {
@@ -294,12 +299,23 @@ func (t *Ctlrpc) AppendFile(arg *AppendData, size1 *int) error {
 func (t *Ctlrpc) FinishFile(arg *AppendData, reply *int) error {
 	fp := cfg.GetTrans(arg.Key)
 	pathname1 := fp.Name()
+	//close fp in DelCloseTrans
 	cfg.DelCloseTrans(arg.Key)
 	defer os.Remove(pathname1)
 	//unzip
 	*reply = 1
 	err := UnZipFile(pathname1, arg.Name)
+	if err != nil {
+		return err
+	}
 	//save filemap
+	flist := cfg.GetList(arg.Name)
+	data, err := json.Marshal(flist)
+	if err != nil {
+		return err
+	}
+	fn := filepath.Join(cfg.GetRoot(arg.Name), descName)
+	err = ioutil.WriteFile(fn, data, 0644)
 	return err
 }
 
@@ -423,4 +439,24 @@ func UnZipFile(filename, name1 string) error {
 		}
 	}
 	return nil
+}
+
+func GetCachedFileMap(rootpath string) (res map[string]files.FileDesc, err error) {
+	fn := filepath.Join(rootpath, descName)
+	data, err := ioutil.ReadFile(fn)
+	if err != nil {
+		return nil, err
+	}
+	res = make(map[string]files.FileDesc)
+	err = json.Unmarshal(data, &res)
+	return
+}
+
+func GetFileMap(rootpath string) (res map[string]files.FileDesc, err error) {
+	res, err = GetCachedFileMap(rootpath)
+	if err == nil {
+		return
+	}
+	res, err = files.GetFileMap(rootpath)
+	return
 }
