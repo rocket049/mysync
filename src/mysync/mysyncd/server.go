@@ -247,6 +247,17 @@ func (t *Ctlrpc) Logout(arg *Args, res *string) error {
 	if bytes.Compare(vmsg, arg.Msg) != 0 {
 		return errors.New("Logout: security verify fail")
 	}
+	//save filemap
+	flist := cfg.GetList(name1)
+	data, err := json.Marshal(flist)
+	if err != nil {
+		return err
+	}
+	fn := filepath.Join(cfg.GetRoot(name1), descName)
+	err = ioutil.WriteFile(fn, data, 0644)
+	if err != nil {
+		return err
+	}
 	*res = "Logout"
 	//delete(filemap, name1)
 	//delete(asekey, name1)
@@ -308,14 +319,7 @@ func (t *Ctlrpc) FinishFile(arg *AppendData, reply *int) error {
 	if err != nil {
 		return err
 	}
-	//save filemap
-	flist := cfg.GetList(arg.Name)
-	data, err := json.Marshal(flist)
-	if err != nil {
-		return err
-	}
-	fn := filepath.Join(cfg.GetRoot(arg.Name), descName)
-	err = ioutil.WriteFile(fn, data, 0644)
+
 	return err
 }
 
