@@ -191,7 +191,7 @@ func (t *Ctlrpc) Login(arg *Args, reply *[]byte) error {
 	if ok == false {
 		return errors.New("Path error on Server")
 	}
-	flist, err := GetFileMap(path1)
+	flist, err := files.UpdateFileMap(path1)
 	if err != nil {
 		return err
 	}

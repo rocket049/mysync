@@ -141,7 +141,7 @@ func login(rpc1 *rpc.Client, name1 string) []byte {
 }
 
 func syncDel(rpc1 *rpc.Client, name1 string, k []byte) (uplist []string, retk []byte) {
-	local_list, err := files.GetFileMap(root)
+	local_list, err := files.UpdateFileMap(root)
 	if err != nil {
 		log.Println(err)
 		return nil, nil
