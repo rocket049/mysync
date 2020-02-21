@@ -55,12 +55,12 @@ func (p *FilterWalker) Walker(path1 string, info os.FileInfo, err error) error {
 	if ok == false {
 		fd1.MD5 = GetFileMD5(path1)
 		p.ResMap[upath] = fd1
-		log.Println("add", upath)
+		//log.Println("add", upath)
 		return nil
 	}
 	if fd1.Mtime.After(fd0.Mtime) {
 		fd1.MD5 = GetFileMD5(path1)
-		log.Println("update", upath)
+		//log.Println("update", upath)
 	} else {
 		fd1.MD5 = fd0.MD5
 	}
