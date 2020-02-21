@@ -86,6 +86,11 @@ func UpdateFileMap(rootpath string) (res map[string]FileDesc, err error) {
 		log.Printf("prevent panic by handling failure accessing a path %q: %v\n", rootpath, err)
 		return nil, err
 	} else {
+		data, err := json.Marshal(w.ResMap)
+		if err != nil {
+			return nil, err
+		}
+		ioutil.WriteFile(filepath.Join(rootpath, "_desc.json"), data, 0644)
 		return w.ResMap, nil
 	}
 }
