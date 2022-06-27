@@ -9,6 +9,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"errors"
+	"flag"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -27,6 +28,7 @@ type Args struct {
 	Valid   []byte //crypto []byte with rsa(first time), aes
 	Msg     []byte
 	FileMap map[string]files.FileDesc
+	Mode    int8 //0:upload and delete, 1:upload, not delete
 }
 type Reply struct {
 	Valid   []byte //crypto []byte with rsa(first time),aes
@@ -48,7 +50,11 @@ const root = "."
 const pri_key_dir = "_mysync/"
 const conf_file_dir = "_mysync/"
 
+var mode *int
+
 func main() {
+	mode = flag.Int("m", 1, "mode: 0-upload and delete, 1-upload not delete")
+	flag.Parse()
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
 	var cfg1 = conf.ReadJSON(path.Join(conf_file_dir, "config.json"))
 	if cfg1 == nil {
@@ -156,7 +162,8 @@ func syncDel(rpc1 *rpc.Client, name1 string, k []byte) (uplist []string, retk []
 	if valid == nil {
 		return nil, nil
 	}
-	var arg = Args{valid, buf1.Bytes(), local_list}
+	//当 Mode==1, 服务端不删除多余的文件
+	var arg = Args{Valid: valid, Msg: buf1.Bytes(), FileMap: local_list, Mode: int8(*mode)}
 	var reply Reply
 	err = rpc1.Call("Ctlrpc.SyncDel", &arg, &reply)
 	k1 := mycrypto.AES256Decode(k, reply.Valid)
@@ -180,7 +187,7 @@ func logout(rpc1 *rpc.Client, name1 string, k []byte) error {
 	if valid == nil {
 		return errors.New("logout error AES256Encode")
 	}
-	var arg = Args{valid, buf1.Bytes(), nil}
+	var arg = Args{valid, buf1.Bytes(), nil, 0}
 	var reply string = "logout: No reply"
 	err := rpc1.Call("Ctlrpc.Logout", &arg, &reply)
 	log.Println(reply)
@@ -200,7 +207,7 @@ func rpcUploadList(rpc1 *rpc.Client, uplist []string, name1 string, k []byte) er
 	if valid == nil {
 		return errors.New("rpcUploadList: aes crypto error")
 	}
-	var arg1 = Args{valid, buf1.Bytes(), nil}
+	var arg1 = Args{valid, buf1.Bytes(), nil, 0}
 	var fid int
 	err := rpc1.Call("Ctlrpc.CreateTempFile", &arg1, &fid)
 	if err != nil {

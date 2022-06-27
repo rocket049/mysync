@@ -34,6 +34,7 @@ type Args struct {
 	Valid   []byte
 	Msg     []byte
 	FileMap map[string]files.FileDesc
+	Mode    int8 //0:upload and delete, 1:upload, not delete
 }
 type Reply struct {
 	Valid   []byte
@@ -217,13 +218,17 @@ func (t *Ctlrpc) SyncDel(arg *Args, res *Reply) error {
 	}
 	flist := cfg.GetList(name1)
 	up1, del1 := files.DiffList(arg.FileMap, flist)
-
-	path1 := cfg.GetRoot(name1)
-	for _, v := range del1 {
-		p1 := path.Join(path1, v)
-		os.RemoveAll(p1)
-		log.Printf("DEL: %v\n", p1)
+	if arg.Mode == 0 {
+		path1 := cfg.GetRoot(name1)
+		for _, v := range del1 {
+			p1 := path.Join(path1, v)
+			os.RemoveAll(p1)
+			log.Printf("DEL: %v\n", p1)
+		}
+	} else {
+		del1 = []string{}
 	}
+
 	//reply uplosd list
 	res.UpList = up1
 	res.DelList = del1
